@@ -1,6 +1,6 @@
 # NSE Portfolio
 
-A simple NSE-only portfolio tracker. Each user registers with an email ID and password; Supabase Auth and Postgres row-level security keep holdings private per user. NSE quotes come from the unofficial Yahoo Finance chart endpoint through `api/quote.js`. Prices refresh on load and every minute while the app is open. Delays and rate limits are possible; do not use for trading decisions.
+A simple NSE-only portfolio tracker. Each user registers with an email ID and password; Supabase Auth and Postgres row-level security keep holdings private per user. Search suggestions come from Yahoo Finance and show NSE equities only. A selected symbol is stored with its `.NS` suffix, and NSE quotes come from the unofficial Yahoo Finance chart endpoint through `api/quote.js`. Existing symbol-only holdings remain until edited. Prices refresh on load and every minute while the app is open. Delays and rate limits are possible; do not use for trading decisions.
 
 ## Supabase setup
 
@@ -16,3 +16,14 @@ The project URL and browser-safe **publishable** key are preset as defaults in `
 Import this repository into Vercel (Framework Preset: Other; Root Directory: `./`). Leave Build Command and Output Directory empty. No environment variables are needed because the public project URL and publishable key are defaults in `api/config.js`. You may override them using `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` if moving to another project. Deploy, then test registering two separate users and verify each sees only its own holdings. GitHub changes deploy automatically after import.
 
 `api/config.js` makes only the public URL and publishable key available to the browser. `api/quote.js` proxies prices. No paid API key or other environment variable is needed. The app never falls back to unprotected local storage.
+
+## Updating existing installations
+
+Before users add stocks with the new picker, run this once in the Supabase SQL Editor to allow full NSE tickers:
+
+```sql
+alter table public.holdings drop constraint if exists holdings_symbol_check;
+alter table public.holdings add constraint holdings_symbol_check check (symbol ~ '^[A-Z0-9][A-Z0-9&-]{0,19}(\.NS)?$');
+```
+
+Older holdings are never remapped automatically; edit an invalid ticker with the picker. This migration is already installed on the supplied project.
