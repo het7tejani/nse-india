@@ -3,10 +3,10 @@ const cache = new Map();
 const TTL = 60_000;
 const STALE = 15 * 60_000;
 const MAX_SYMBOLS = 25;
-const SYMBOL = /^[A-Z0-9][A-Z0-9&-]{0,19}$/;
+const SYMBOL = /^[A-Z0-9][A-Z0-9&-]{0,19}(\.NS)?$/;
 
 async function quote(symbol) {
-  const key = symbol + '.NS';
+  const key = symbol.endsWith('.NS') ? symbol : symbol + '.NS';
   const cached = cache.get(key);
   if (cached && Date.now() - cached.at < TTL) return { ...cached.value, cached: true };
   try {
@@ -31,7 +31,7 @@ async function quote(symbol) {
     const candles = (chart?.indicators?.quote?.[0]?.close || []).filter(Number.isFinite);
     const previousClose = Number.isFinite(meta.previousClose) ? meta.previousClose : candles.length >= 2 ? candles[candles.length - 2] : null;
     const value = {
-      symbol, price: meta.regularMarketPrice,
+      symbol, resolvedSymbol: key, name: meta.longName || meta.shortName || symbol, price: meta.regularMarketPrice,
       previousClose: Number.isFinite(previousClose) && previousClose > 0 ? previousClose : null,
       asOf: meta.regularMarketTime ? new Date(meta.regularMarketTime * 1000).toISOString() : null,
       currency: 'INR', source: 'Yahoo Finance', delayed: true
@@ -48,7 +48,7 @@ module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const input = typeof req.query.symbols === 'string' ? req.query.symbols : '';
-  const symbols = [...new Set(input.toUpperCase().split(',').map(s => s.trim().replace(/\.NS$/, '')).filter(Boolean))];
+  const symbols = [...new Set(input.toUpperCase().split(',').map(s => s.trim()).filter(Boolean))];
   if (!symbols.length || symbols.length > MAX_SYMBOLS || symbols.some(s => !SYMBOL.test(s))) return res.status(400).json({ error: `Enter 1-${MAX_SYMBOLS} valid NSE symbols` });
   const quotes = await Promise.all(symbols.map(quote));
   return res.status(200).json({ quotes, fetchedAt: new Date().toISOString() });
